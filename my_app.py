@@ -7,7 +7,7 @@ import requests
 app = Flask(__name__)
 
 # Load the model (Assuming the model is in the same directory as this script)
-model = joblib.load('dark_pattern_modelNew.joblib')
+model = joblib.load('dark_pattern_model.joblib')
 
 
 
