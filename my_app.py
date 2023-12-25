@@ -7,7 +7,7 @@ import requests
 app = Flask(__name__)
 
 # Load the model (Assuming the model is in the same directory as this script)
-model = joblib.load('dark_pattern_model.joblib')
+model = joblib.load('dark_pattern_modelNew.joblib')
 
 
 
@@ -20,7 +20,7 @@ model = joblib.load('dark_pattern_model.joblib')
     # Prediction function
 def predict_dark_pattern(text):
     prediction = model.predict([text])
-    return "Dark Pattern" if prediction[0] == 1 else "Not Dark Pattern"
+    return '1' if prediction[0] == 1 else '0'
 
 
 
@@ -62,3 +62,4 @@ def get_text_from_url(url):
 # Run the Flask application
 if __name__ == '__main__':
     app.run(debug=True)
+    
