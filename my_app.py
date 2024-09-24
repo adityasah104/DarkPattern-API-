@@ -6,12 +6,8 @@ import requests
 # Define the Flask application
 app = Flask(__name__)
 
-# Load the model (Assuming the model is in the same directory as this script)
+# Load the model
 model = joblib.load('dark_pattern_model.joblib')
-
-
-
-
 
 
 
@@ -36,8 +32,7 @@ def predict():
     if text:
         prediction = predict_dark_pattern(text)
         return jsonify({'prediction': prediction})
-    # else:
-    #     return jsonify({'error': 'Unable to extract text from the provided URL.'}), 500
+
     
 
 # Function to extract text from URL
@@ -46,8 +41,6 @@ def get_text_from_url(url):
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'}
     try:
         response = requests.get(url, headers=headers, timeout=10)
-        # if response.status_code != 200:
-        #     return None, f"Error fetching the webpage: Status code {response.status_code}"
         soup = BeautifulSoup(response.text, 'html.parser')
         text = soup.get_text(separator=' ')
         return text, None
@@ -57,9 +50,6 @@ def get_text_from_url(url):
         return None, f"An error occurred: {e}"
 
 
-
-
-# Run the Flask application
 if __name__ == '__main__':
     app.run(debug=True)
     
