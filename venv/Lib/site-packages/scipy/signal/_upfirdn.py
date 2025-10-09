@@ -33,6 +33,7 @@
 
 import numpy as np
 
+from scipy._lib._array_api import array_namespace
 from ._upfirdn_apply import _output_len, _apply, mode_enum
 
 __all__ = ['upfirdn', '_output_len']
@@ -92,7 +93,7 @@ class _UpFIRDn:
         output_len = _output_len(self._h_len_orig, x.shape[axis],
                                  self._up, self._down)
         # Explicit use of np.int64 for output_shape dtype avoids OverflowError
-        # when allocating large array on platforms where np.int_ is 32 bits
+        # when allocating large array on platforms where intp is 32 bits.
         output_shape = np.asarray(x.shape, dtype=np.int64)
         output_shape[axis] = output_len
         out = np.zeros(output_shape, dtype=self._output_type, order='C')
@@ -210,7 +211,9 @@ def upfirdn(h, x, up=1, down=1, axis=-1, mode='constant', cval=0):
            [ 6.,  7.],
            [ 6.,  7.]])
     """
+    xp = array_namespace(h, x)
+
     x = np.asarray(x)
     ufd = _UpFIRDn(h, x.dtype, up, down)
     # This is equivalent to (but faster than) using np.apply_along_axis
-    return ufd.apply_filter(x, axis, mode, cval)
+    return xp.asarray(ufd.apply_filter(x, axis, mode, cval))

@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from numpy import arange, add, array, eye, copy, sqrt
+from numpy import arange, array, eye, copy, sqrt
 from numpy.testing import (assert_equal, assert_array_equal,
                            assert_array_almost_equal, assert_allclose)
 from pytest import raises as assert_raises
@@ -8,114 +8,11 @@ from pytest import raises as assert_raises
 from scipy.fft import fft
 from scipy.special import comb
 from scipy.linalg import (toeplitz, hankel, circulant, hadamard, leslie, dft,
-                          companion, tri, triu, tril, kron, block_diag,
+                          companion, kron, block_diag,
                           helmert, hilbert, invhilbert, pascal, invpascal,
                           fiedler, fiedler_companion, eigvals,
                           convolution_matrix)
 from numpy.linalg import cond
-
-
-def get_mat(n):
-    data = arange(n)
-    data = add.outer(data, data)
-    return data
-
-dep_filter = np.testing.suppress_warnings()
-dep_filter.filter(DeprecationWarning, "'tri'/'tril/'triu'")
-
-@dep_filter
-class TestTri:
-    def test_basic(self):
-        assert_equal(tri(4), array([[1, 0, 0, 0],
-                                    [1, 1, 0, 0],
-                                    [1, 1, 1, 0],
-                                    [1, 1, 1, 1]]))
-        assert_equal(tri(4, dtype='f'), array([[1, 0, 0, 0],
-                                               [1, 1, 0, 0],
-                                               [1, 1, 1, 0],
-                                               [1, 1, 1, 1]], 'f'))
-
-    def test_diag(self):
-        assert_equal(tri(4, k=1), array([[1, 1, 0, 0],
-                                         [1, 1, 1, 0],
-                                         [1, 1, 1, 1],
-                                         [1, 1, 1, 1]]))
-        assert_equal(tri(4, k=-1), array([[0, 0, 0, 0],
-                                          [1, 0, 0, 0],
-                                          [1, 1, 0, 0],
-                                          [1, 1, 1, 0]]))
-
-    def test_2d(self):
-        assert_equal(tri(4, 3), array([[1, 0, 0],
-                                       [1, 1, 0],
-                                       [1, 1, 1],
-                                       [1, 1, 1]]))
-        assert_equal(tri(3, 4), array([[1, 0, 0, 0],
-                                       [1, 1, 0, 0],
-                                       [1, 1, 1, 0]]))
-
-    def test_diag2d(self):
-        assert_equal(tri(3, 4, k=2), array([[1, 1, 1, 0],
-                                            [1, 1, 1, 1],
-                                            [1, 1, 1, 1]]))
-        assert_equal(tri(4, 3, k=-2), array([[0, 0, 0],
-                                             [0, 0, 0],
-                                             [1, 0, 0],
-                                             [1, 1, 0]]))
-
-
-@dep_filter
-class TestTril:
-    def test_basic(self):
-        a = (100*get_mat(5)).astype('l')
-        b = a.copy()
-        for k in range(5):
-            for l in range(k+1, 5):
-                b[k, l] = 0
-        assert_equal(tril(a), b)
-
-    def test_diag(self):
-        a = (100*get_mat(5)).astype('f')
-        b = a.copy()
-        for k in range(5):
-            for l in range(k+3, 5):
-                b[k, l] = 0
-        assert_equal(tril(a, k=2), b)
-        b = a.copy()
-        for k in range(5):
-            for l in range(max((k-1, 0)), 5):
-                b[k, l] = 0
-        assert_equal(tril(a, k=-2), b)
-
-
-@dep_filter
-class TestTriu:
-    def test_basic(self):
-        a = (100*get_mat(5)).astype('l')
-        b = a.copy()
-        for k in range(5):
-            for l in range(k+1, 5):
-                b[l, k] = 0
-        assert_equal(triu(a), b)
-
-    def test_diag(self):
-        a = (100*get_mat(5)).astype('f')
-        b = a.copy()
-        for k in range(5):
-            for l in range(max((k-1, 0)), 5):
-                b[l, k] = 0
-        assert_equal(triu(a, k=2), b)
-        b = a.copy()
-        for k in range(5):
-            for l in range(k+3, 5):
-                b[l, k] = 0
-        assert_equal(triu(a, k=-2), b)
-
-
-@pytest.mark.parametrize("func", [tri, tril, triu])
-def test_special_matrices_deprecation(func):
-    with pytest.warns(DeprecationWarning, match="'tri'/'tril/'triu'"):
-        func(np.array([[1]]))
 
 
 class TestToeplitz:
@@ -203,7 +100,6 @@ class TestLeslie:
 
     def test_bad_shapes(self):
         assert_raises(ValueError, leslie, [[1, 1], [2, 2]], [3, 4, 5])
-        assert_raises(ValueError, leslie, [3, 4, 5], [[1, 1], [2, 2]])
         assert_raises(ValueError, leslie, [1, 2], [1, 2])
         assert_raises(ValueError, leslie, [1], [])
 
@@ -218,7 +114,6 @@ class TestLeslie:
 class TestCompanion:
 
     def test_bad_shapes(self):
-        assert_raises(ValueError, companion, [[1, 1], [2, 2]])
         assert_raises(ValueError, companion, [0, 4, 5])
         assert_raises(ValueError, companion, [1])
         assert_raises(ValueError, companion, [])
@@ -234,6 +129,16 @@ class TestCompanion:
         expected = array([
             [-2.5, 5.0],
             [1.0, 0.0]])
+        assert_array_equal(c, expected)
+
+        c = companion([(1.0, 2.0, 3.0),
+                       (4.0, 5.0, 6.0)])
+        expected = array([
+            ([-2.00, -3.00],
+             [+1.00, +0.00]),
+            ([-1.25, -1.50],
+             [+1.00, +0.00])
+        ])
         assert_array_equal(c, expected)
 
 
@@ -266,9 +171,6 @@ class TestBlockDiag:
 
         a = block_diag([2, 3], 4)
         assert_array_equal(a, [[2, 3, 0], [0, 0, 4]])
-
-    def test_bad_arg(self):
-        assert_raises(ValueError, block_diag, [[[1]]])
 
     def test_no_args(self):
         a = block_diag()
@@ -306,7 +208,12 @@ class TestBlockDiag:
 
 
 class TestKron:
+    @pytest.mark.thread_unsafe
+    def test_dep(self):
+        with pytest.deprecated_call(match="`kron`"):
+            kron(np.array([[1, 2],[3, 4]]),np.array([[1, 1, 1]]))
 
+    @pytest.mark.filterwarnings('ignore::DeprecationWarning')
     def test_basic(self):
 
         a = kron(array([[1, 2], [3, 4]]), array([[1, 1, 1]]))
@@ -321,6 +228,13 @@ class TestKron:
                           [30, 40],
                           [33, 44]])
         assert_array_equal(a, expected)
+
+    @pytest.mark.filterwarnings('ignore::DeprecationWarning')
+    def test_empty(self):
+        m1 = np.empty((0, 2))
+        m2 = np.empty((1, 3))
+        a = kron(m1, m2)
+        assert_allclose(a, np.empty((0, 6)))
 
 
 class TestHelmert:
@@ -587,8 +501,7 @@ def test_invpascal():
         # precision when n is greater than 18.  Instead we'll cast both to
         # object arrays, and then multiply.
         e = ip.astype(object).dot(p.astype(object))
-        assert_array_equal(e, eye(n), err_msg="n=%d  kind=%r exact=%r" %
-                                              (n, kind, exact))
+        assert_array_equal(e, eye(n), err_msg=f"n={n}  kind={kind!r} exact={exact!r}")
 
     kinds = ['symmetric', 'lower', 'upper']
 
@@ -668,11 +581,6 @@ class TestConvolutionMatrix:
         with pytest.raises(ValueError, match='n must be a positive integer'):
             convolution_matrix([1, 2, 3], 0)
 
-    def test_bad_first_arg(self):
-        # first arg must be a 1d array, otherwise ValueError
-        with pytest.raises(ValueError, match='one-dimensional'):
-            convolution_matrix(1, 4)
-
     def test_empty_first_arg(self):
         # first arg must have at least one value
         with pytest.raises(ValueError, match=r'len\(a\)'):
@@ -698,3 +606,31 @@ class TestConvolutionMatrix:
             A = convolution_matrix(a, nv, mode)
         y2 = A @ v
         assert_array_almost_equal(y1, y2)
+
+
+@pytest.mark.thread_unsafe
+@pytest.mark.fail_slow(5)  # `leslie` has an import in the function
+@pytest.mark.parametrize('f, args', [(circulant, ()),
+                                     (companion, ()),
+                                     (convolution_matrix, (5, 'same')),
+                                     (fiedler, ()),
+                                     (fiedler_companion, ()),
+                                     (leslie, (np.arange(9),)),
+                                     (toeplitz, (np.arange(9),)),
+                                     ])
+def test_batch(f, args):
+    rng = np.random.default_rng(283592436523456)
+    batch_shape = (2, 3)
+    m = 10
+    A = rng.random(batch_shape + (m,))
+
+    if f in {toeplitz}:
+        message = "Beginning in SciPy 1.17, multidimensional input will be..."
+        with pytest.warns(FutureWarning, match=message):
+            f(A, *args)
+        return
+
+    res = f(A, *args)
+    ref = np.asarray([f(a, *args) for a in A.reshape(-1, m)])
+    ref = ref.reshape(A.shape[:-1] + ref.shape[-2:])
+    assert_allclose(res, ref)

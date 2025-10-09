@@ -5,8 +5,14 @@ import threading
 import contextlib
 
 import numpy as np
+
+from scipy._lib._util import copy_if_needed
+
 # good_size is exposed (and used) from this import
-from .pypocketfft import good_size  # noqa: F401
+from .pypocketfft import good_size, prev_good_size
+
+
+__all__ = ['good_size', 'prev_good_size', 'set_workers', 'get_workers']
 
 _config = threading.local()
 _cpu_count = os.cpu_count()
@@ -32,14 +38,41 @@ def _iterable_of_int(x, name=None):
         x = [operator.index(a) for a in x]
     except TypeError as e:
         name = name or "value"
-        raise ValueError("{} must be a scalar or iterable of integers"
-                         .format(name)) from e
+        raise ValueError(f"{name} must be a scalar or iterable of integers") from e
 
     return x
 
 
 def _init_nd_shape_and_axes(x, shape, axes):
-    """Handles shape and axes arguments for nd transforms"""
+    """
+    Handle shape and axes arguments for N-D transforms.
+
+    Returns the shape and axes in a standard form, taking into account negative
+    values and checking for various potential errors.
+
+    Parameters
+    ----------
+    x : ndarray
+        The input array.
+    shape : int or array_like of ints or None
+        The shape of the result. If both `shape` and `axes` (see below) are
+        None, `shape` is ``x.shape``; if `shape` is None but `axes` is
+        not None, then `shape` is ``numpy.take(x.shape, axes, axis=0)``.
+        If `shape` is -1, the size of the corresponding dimension of `x` is
+        used.
+    axes : int or array_like of ints or None
+        Axes along which the calculation is computed.
+        The default is over all axes.
+        Negative indices are automatically converted to their positive
+        counterparts.
+
+    Returns
+    -------
+    shape : tuple
+        The shape of the result as a tuple of integers.
+    axes : list
+        Axes along which the calculation is computed, as a list of integers.
+    """
     noshape = shape is None
     noaxes = axes is None
 
@@ -74,7 +107,7 @@ def _init_nd_shape_and_axes(x, shape, axes):
         raise ValueError(
             f"invalid number of data points ({shape}) specified")
 
-    return shape, axes
+    return tuple(shape), list(axes)
 
 
 def _asfarray(x):
@@ -94,7 +127,7 @@ def _asfarray(x):
     # Require native byte order
     dtype = x.dtype.newbyteorder('=')
     # Always align input
-    copy = not x.flags['ALIGNED']
+    copy = True if not x.flags['ALIGNED'] else copy_if_needed
     return np.array(x, dtype=dtype, copy=copy)
 
 def _datacopied(arr, original):
@@ -166,8 +199,8 @@ def _workers(workers):
         if workers >= -_cpu_count:
             workers += 1 + _cpu_count
         else:
-            raise ValueError("workers value out of range; got {}, must not be"
-                             " less than {}".format(workers, -_cpu_count))
+            raise ValueError(f"workers value out of range; got {workers}, must not be"
+                             f" less than {-_cpu_count}")
     elif workers == 0:
         raise ValueError("workers must not be zero")
 

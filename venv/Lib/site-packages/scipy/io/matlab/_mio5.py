@@ -69,6 +69,7 @@ Henkelmann; parts of the code for simplify_cells=True adapted from
 http://blog.nephics.com/2019/08/28/better-loadmat-for-scipy/.
 '''
 
+import math
 import os
 import time
 import sys
@@ -86,7 +87,7 @@ from ._byteordercodes import native_code, swapped_code
 
 from ._miobase import (MatFileReader, docfiller, matdims, read_dtype,
                       arr_to_chars, arr_dtype_number, MatWriteError,
-                      MatReadError, MatReadWarning)
+                      MatReadError, MatReadWarning, MatWriteWarning)
 
 # Reader object for matlab 5 format variables
 from ._mio5_utils import VarReader5
@@ -152,7 +153,7 @@ class MatFile5Reader(MatFileReader):
     uint16_codec - char codec to use for uint16 char arrays
         (defaults to system default codec)
 
-    Uses variable reader that has the following stardard interface (see
+    Uses variable reader that has the following standard interface (see
     abstract class in ``miobase``::
 
        __init__(self, file_reader)
@@ -220,7 +221,7 @@ class MatFile5Reader(MatFileReader):
         hdict['__header__'] = hdr['description'].item().strip(b' \t\n\000')
         v_major = hdr['version'] >> 8
         v_minor = hdr['version'] & 0xFF
-        hdict['__version__'] = '%d.%d' % (v_major, v_minor)
+        hdict['__version__'] = f'{v_major}.{v_minor}'
         return hdict
 
     def initialize_read(self):
@@ -266,7 +267,7 @@ class MatFile5Reader(MatFileReader):
             check_stream_limit = False
             self._matrix_reader.set_stream(self.mat_stream)
         if not mdtype == miMATRIX:
-            raise TypeError('Expecting miMATRIX type here, got %d' % mdtype)
+            raise TypeError(f'Expecting miMATRIX type here, got {mdtype}')
         header = self._matrix_reader.read_header(check_stream_limit)
         return header, next_pos
 
@@ -310,11 +311,13 @@ class MatFile5Reader(MatFileReader):
             hdr, next_position = self.read_var_header()
             name = 'None' if hdr.name is None else hdr.name.decode('latin1')
             if name in mdict:
-                warnings.warn('Duplicate variable name "%s" in stream'
-                              ' - replacing previous with new\n'
-                              'Consider mio5.varmats_from_mat to split '
-                              'file into single variable files' % name,
-                              MatReadWarning, stacklevel=2)
+                msg = (
+                    f'Duplicate variable name "{name}" in stream'
+                    " - replacing previous with new\nConsider"
+                    "scipy.io.matlab.varmats_from_mat to split "
+                    "file into single variable files"
+                )
+                warnings.warn(msg, MatReadWarning, stacklevel=2)
             if name == '':
                 # can only be a matlab 7 function workspace
                 name = '__function_workspace__'
@@ -330,10 +333,9 @@ class MatFile5Reader(MatFileReader):
                 res = self.read_var_array(hdr, process)
             except MatReadError as err:
                 warnings.warn(
-                    'Unreadable variable "%s", because "%s"' %
-                    (name, err),
+                    f'Unreadable variable "{name}", because "{err}"',
                     Warning, stacklevel=2)
-                res = "Read error: %s" % err
+                res = f"Read error: {err}"
             self.mat_stream.seek(next_position)
             mdict[name] = res
             if hdr.is_global:
@@ -403,10 +405,9 @@ def varmats_from_mat(file_obj):
     Examples
     --------
     >>> import scipy.io
-
-    BytesIO is from the ``io`` module in Python 3, and is ``cStringIO`` for
-    Python < 3.
-
+    >>> import numpy as np
+    >>> from io import BytesIO
+    >>> from scipy.io.matlab._mio5 import varmats_from_mat
     >>> mat_fileobj = BytesIO()
     >>> scipy.io.savemat(mat_fileobj, {'b': np.arange(10), 'a': 'a string'})
     >>> varmats = varmats_from_mat(mat_fileobj)
@@ -481,10 +482,14 @@ def to_writeable(source):
         dtype = []
         values = []
         for field, value in source.items():
-            if (isinstance(field, str) and
-                    field[0] not in '_0123456789'):
-                dtype.append((str(field), object))
-                values.append(value)
+            if isinstance(field, str):
+                if field[0] not in '_0123456789':
+                    dtype.append((str(field), object))
+                    values.append(value)
+                else:
+                    msg = (f"Starting field name with a underscore "
+                           f"or a digit ({field}) is ignored")
+                    warnings.warn(msg, MatWriteWarning, stacklevel=2)
         if dtype:
             return np.array([tuple(values)], dtype)
         else:
@@ -534,7 +539,7 @@ class VarWriter5:
             mdtype = NP_TO_MTYPES[arr.dtype.str[1:]]
         # Array needs to be in native byte order
         if arr.dtype.byteorder == swapped_code:
-            arr = arr.byteswap().newbyteorder()
+            arr = arr.byteswap().view(arr.dtype.newbyteorder())
         byte_count = arr.size*arr.itemsize
         if byte_count <= 4:
             self.write_smalldata_element(arr, mdtype, byte_count)
@@ -653,8 +658,7 @@ class VarWriter5:
         # Try to convert things that aren't arrays
         narr = to_writeable(arr)
         if narr is None:
-            raise TypeError('Could not convert %s (type %s) to array'
-                            % (arr, type(arr)))
+            raise TypeError(f'Could not convert {arr} (type {type(arr)}) to array')
         if isinstance(narr, MatlabObject):
             self.write_object(narr)
         elif isinstance(narr, MatlabFunction):
@@ -731,7 +735,7 @@ class VarWriter5:
             # transpose here, because we're flattening the array, before
             # we write the bytes. The bytes have to be written in
             # Fortran order.
-            n_chars = np.prod(shape)
+            n_chars = math.prod(shape)
             st_arr = np.ndarray(shape=(),
                                 dtype=arr_dtype_number(arr, n_chars),
                                 buffer=arr.T.copy())  # Fortran order
@@ -789,12 +793,11 @@ class VarWriter5:
         length = max([len(fieldname) for fieldname in fieldnames])+1
         max_length = (self.long_field_names and 64) or 32
         if length > max_length:
-            raise ValueError("Field names are restricted to %d characters" %
-                             (max_length-1))
+            raise ValueError(
+                f"Field names are restricted to {max_length - 1} characters"
+            )
         self.write_element(np.array([length], dtype='i4'))
-        self.write_element(
-            np.array(fieldnames, dtype='S%d' % (length)),
-            mdtype=miINT8)
+        self.write_element(np.array(fieldnames, dtype=f'S{length}'), mdtype=miINT8)
         A = np.atleast_2d(arr).flatten('F')
         for el in A:
             for f in fieldnames:
@@ -846,8 +849,8 @@ class MatFile5Writer:
     def write_file_header(self):
         # write header
         hdr = np.zeros((), NDT_FILE_HDR)
-        hdr['description'] = 'MATLAB 5.0 MAT-file Platform: %s, Created on: %s' \
-            % (os.name,time.asctime())
+        hdr['description'] = (f'MATLAB 5.0 MAT-file Platform: {os.name}, '
+                              f'Created on: {time.asctime()}')
         hdr['version'] = 0x0100
         hdr['endian_test'] = np.ndarray(shape=(),
                                       dtype='S2',
@@ -879,6 +882,9 @@ class MatFile5Writer:
         self._matrix_writer = VarWriter5(self)
         for name, var in mdict.items():
             if name[0] == '_':
+                msg = (f"Starting field name with a "
+                       f"underscore ({name}) is ignored")
+                warnings.warn(msg, MatWriteWarning, stacklevel=2)
                 continue
             is_global = name in self.global_vars
             if self.do_compression:

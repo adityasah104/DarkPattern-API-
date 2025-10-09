@@ -2,6 +2,7 @@ import warnings
 
 import numpy as np
 from numpy import asarray_chkfinite
+from scipy._lib._util import _apply_over_batch
 from ._misc import LinAlgError, _datacopied, LinAlgWarning
 from .lapack import get_lapack_funcs
 
@@ -114,7 +115,7 @@ def _qz(A, B, output='real', lwork=None, sort=None, overwrite_a=False,
     if lwork is None or lwork == -1:
         # get optimal work array size
         result = gges(lambda x: None, a1, b1, lwork=-1)
-        lwork = result[-2][0].real.astype(np.int_)
+        lwork = result[-2][0].real.astype(int)
 
     def sfunction(x):
         return None
@@ -127,7 +128,7 @@ def _qz(A, B, output='real', lwork=None, sort=None, overwrite_a=False,
     elif info > 0 and info <= a_n:
         warnings.warn("The QZ iteration failed. (a,b) are not in Schur "
                       "form, but ALPHAR(j), ALPHAI(j), and BETA(j) should be "
-                      "correct for J={},...,N".format(info-1), LinAlgWarning,
+                      f"correct for J={info-1},...,N", LinAlgWarning,
                       stacklevel=3)
     elif info == a_n+1:
         raise LinAlgError("Something other than QZ iteration failed")
@@ -142,6 +143,7 @@ def _qz(A, B, output='real', lwork=None, sort=None, overwrite_a=False,
     return result, gges.typecode
 
 
+@_apply_over_batch(('A', 2), ('B', 2))
 def qz(A, B, output='real', lwork=None, sort=None, overwrite_a=False,
        overwrite_b=False, check_finite=True):
     """
@@ -317,6 +319,7 @@ def qz(A, B, output='real', lwork=None, sort=None, overwrite_a=False,
     return result[0], result[1], result[-4], result[-3]
 
 
+@_apply_over_batch(('A', 2), ('B', 2))
 def ordqz(A, B, sort='lhp', output='real', overwrite_a=False,
           overwrite_b=False, check_finite=True):
     """QZ decomposition for a pair of matrices with reordering.
@@ -388,7 +391,7 @@ def ordqz(A, B, sort='lhp', output='real', overwrite_a=False,
     that would result if the 2-by-2 diagonal blocks of the real generalized
     Schur form of (A,B) were further reduced to triangular form using complex
     unitary transformations. If ALPHAI(j) is zero, then the jth eigenvalue is
-    real; if positive, then the ``j``th and ``(j+1)``st eigenvalues are a
+    real; if positive, then the ``j``\\ th and ``(j+1)``\\ st eigenvalues are a
     complex conjugate pair, with ``ALPHAI(j+1)`` negative.
 
     .. versionadded:: 0.17.0

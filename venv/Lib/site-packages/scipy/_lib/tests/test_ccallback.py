@@ -9,12 +9,6 @@ from scipy._lib import _ccallback_c as _test_ccallback_cython
 from scipy._lib import _test_ccallback
 from scipy._lib._ccallback import LowLevelCallable
 
-try:
-    import cffi
-    HAVE_CFFI = True
-except ImportError:
-    HAVE_CFFI = False
-
 
 ERROR_VALUE = 2.0
 
@@ -29,8 +23,7 @@ def callback_python(a, user_data=None):
         return a + user_data
 
 def _get_cffi_func(base, signature):
-    if not HAVE_CFFI:
-        pytest.skip("cffi not installed")
+    cffi = pytest.importorskip("cffi")
 
     # Get function address
     voidp = ctypes.cast(base, ctypes.c_void_p)
@@ -48,8 +41,7 @@ def _get_ctypes_data():
 
 
 def _get_cffi_data():
-    if not HAVE_CFFI:
-        pytest.skip("cffi not installed")
+    cffi = pytest.importorskip("cffi")
     ffi = cffi.FFI()
     return ffi.new('double *', 2.0)
 
@@ -65,12 +57,14 @@ CALLERS = {
 FUNCS = {
     'python': lambda: callback_python,
     'capsule': lambda: _test_ccallback.test_get_plus1_capsule(),
-    'cython': lambda: LowLevelCallable.from_cython(_test_ccallback_cython, "plus1_cython"),
+    'cython': lambda: LowLevelCallable.from_cython(_test_ccallback_cython,
+                                                   "plus1_cython"),
     'ctypes': lambda: _test_ccallback_cython.plus1_ctypes,
     'cffi': lambda: _get_cffi_func(_test_ccallback_cython.plus1_ctypes,
                                    'double (*)(double, int *, void *)'),
     'capsule_b': lambda: _test_ccallback.test_get_plus1b_capsule(),
-    'cython_b': lambda: LowLevelCallable.from_cython(_test_ccallback_cython, "plus1b_cython"),
+    'cython_b': lambda: LowLevelCallable.from_cython(_test_ccallback_cython,
+                                                     "plus1b_cython"),
     'ctypes_b': lambda: _test_ccallback_cython.plus1b_ctypes,
     'cffi_b': lambda: _get_cffi_func(_test_ccallback_cython.plus1b_ctypes,
                                      'double (*)(double, double, int *, void *)'),
@@ -79,10 +73,13 @@ FUNCS = {
 # These functions have signatures the callers don't know
 BAD_FUNCS = {
     'capsule_bc': lambda: _test_ccallback.test_get_plus1bc_capsule(),
-    'cython_bc': lambda: LowLevelCallable.from_cython(_test_ccallback_cython, "plus1bc_cython"),
+    'cython_bc': lambda: LowLevelCallable.from_cython(_test_ccallback_cython,
+                                                      "plus1bc_cython"),
     'ctypes_bc': lambda: _test_ccallback_cython.plus1bc_ctypes,
-    'cffi_bc': lambda: _get_cffi_func(_test_ccallback_cython.plus1bc_ctypes,
-                                      'double (*)(double, double, double, int *, void *)'),
+    'cffi_bc': lambda: _get_cffi_func(
+        _test_ccallback_cython.plus1bc_ctypes,
+        'double (*)(double, double, double, int *, void *)'
+    ),
 }
 
 USER_DATAS = {

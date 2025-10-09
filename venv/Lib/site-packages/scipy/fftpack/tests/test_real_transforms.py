@@ -1,4 +1,5 @@
 from os.path import join, dirname
+import threading
 
 import numpy as np
 from numpy.testing import assert_array_almost_equal, assert_equal
@@ -10,8 +11,8 @@ from scipy.fftpack._realtransforms import (
 
 # Matlab reference data
 MDATA = np.load(join(dirname(__file__), 'test.npz'))
-X = [MDATA['x%d' % i] for i in range(8)]
-Y = [MDATA['y%d' % i] for i in range(8)]
+X = [MDATA[f'x{i}'] for i in range(8)]
+Y = [MDATA[f'y{i}'] for i in range(8)]
 
 # FFTW reference data: the data are organized as follows:
 #    * SIZES is an array containing all available sizes
@@ -26,26 +27,26 @@ FFTWDATA_SIZES = FFTWDATA_DOUBLE['sizes']
 def fftw_dct_ref(type, size, dt):
     x = np.linspace(0, size-1, size).astype(dt)
     dt = np.result_type(np.float32, dt)
-    if dt == np.double:
+    if dt == np.float64:
         data = FFTWDATA_DOUBLE
     elif dt == np.float32:
         data = FFTWDATA_SINGLE
     else:
         raise ValueError()
-    y = (data['dct_%d_%d' % (type, size)]).astype(dt)
+    y = (data[f'dct_{type}_{size}']).astype(dt)
     return x, y, dt
 
 
 def fftw_dst_ref(type, size, dt):
     x = np.linspace(0, size-1, size).astype(dt)
     dt = np.result_type(np.float32, dt)
-    if dt == np.double:
+    if dt == np.float64:
         data = FFTWDATA_DOUBLE
     elif dt == np.float32:
         data = FFTWDATA_SINGLE
     else:
         raise ValueError()
-    y = (data['dst_%d_%d' % (type, size)]).astype(dt)
+    y = (data[f'dst_{type}_{size}']).astype(dt)
     return x, y, dt
 
 
@@ -192,9 +193,14 @@ class _TestDCTBase:
         self.dec = 14
         self.type = None
 
-    def test_definition(self):
+    @pytest.fixture
+    def dct_lock(self):
+        return threading.Lock()
+
+    def test_definition(self, dct_lock):
         for i in FFTWDATA_SIZES:
-            x, yr, dt = fftw_dct_ref(self.type, i, self.rdt)
+            with dct_lock:
+                x, yr, dt = fftw_dct_ref(self.type, i, self.rdt)
             y = dct(x, type=self.type)
             assert_equal(y.dtype, dt)
             # XXX: we divide by np.max(y) because the tests fail otherwise. We
@@ -202,12 +208,13 @@ class _TestDCTBase:
             # difference is due to fftw using a better algorithm w.r.t error
             # propagation compared to the ones from fftpack.
             assert_array_almost_equal(y / np.max(y), yr / np.max(y), decimal=self.dec,
-                    err_msg="Size %d failed" % i)
+                    err_msg=f"Size {i} failed")
 
     def test_axis(self):
         nt = 2
+        rng = np.random.RandomState(1234)
         for i in [7, 8, 9, 16, 32, 64]:
-            x = np.random.randn(nt, i)
+            x = rng.randn(nt, i)
             y = dct(x, type=self.type)
             for j in range(nt):
                 assert_array_almost_equal(y[j], dct(x[j], type=self.type),
@@ -267,7 +274,7 @@ class _TestDCTIVBase(_TestDCTBase):
 
 class TestDCTIDouble(_TestDCTIBase):
     def setup_method(self):
-        self.rdt = np.double
+        self.rdt = np.float64
         self.dec = 10
         self.type = 1
 
@@ -288,7 +295,7 @@ class TestDCTIInt(_TestDCTIBase):
 
 class TestDCTIIDouble(_TestDCTIIBase):
     def setup_method(self):
-        self.rdt = np.double
+        self.rdt = np.float64
         self.dec = 10
         self.type = 2
 
@@ -309,7 +316,7 @@ class TestDCTIIInt(_TestDCTIIBase):
 
 class TestDCTIIIDouble(_TestDCTIIIBase):
     def setup_method(self):
-        self.rdt = np.double
+        self.rdt = np.float64
         self.dec = 14
         self.type = 3
 
@@ -330,7 +337,7 @@ class TestDCTIIIInt(_TestDCTIIIBase):
 
 class TestDCTIVDouble(_TestDCTIVBase):
     def setup_method(self):
-        self.rdt = np.double
+        self.rdt = np.float64
         self.dec = 12
         self.type = 3
 
@@ -355,9 +362,14 @@ class _TestIDCTBase:
         self.dec = 14
         self.type = None
 
-    def test_definition(self):
+    @pytest.fixture
+    def idct_lock(self):
+        return threading.Lock()
+
+    def test_definition(self, idct_lock):
         for i in FFTWDATA_SIZES:
-            xr, yr, dt = fftw_dct_ref(self.type, i, self.rdt)
+            with idct_lock:
+                xr, yr, dt = fftw_dct_ref(self.type, i, self.rdt)
             x = idct(yr, type=self.type)
             if self.type == 1:
                 x /= 2 * (i-1)
@@ -369,12 +381,11 @@ class _TestIDCTBase:
             # difference is due to fftw using a better algorithm w.r.t error
             # propagation compared to the ones from fftpack.
             assert_array_almost_equal(x / np.max(x), xr / np.max(x), decimal=self.dec,
-                    err_msg="Size %d failed" % i)
-
+                    err_msg=f"Size {i} failed")
 
 class TestIDCTIDouble(_TestIDCTBase):
     def setup_method(self):
-        self.rdt = np.double
+        self.rdt = np.float64
         self.dec = 10
         self.type = 1
 
@@ -395,7 +406,7 @@ class TestIDCTIInt(_TestIDCTBase):
 
 class TestIDCTIIDouble(_TestIDCTBase):
     def setup_method(self):
-        self.rdt = np.double
+        self.rdt = np.float64
         self.dec = 10
         self.type = 2
 
@@ -416,7 +427,7 @@ class TestIDCTIIInt(_TestIDCTBase):
 
 class TestIDCTIIIDouble(_TestIDCTBase):
     def setup_method(self):
-        self.rdt = np.double
+        self.rdt = np.float64
         self.dec = 14
         self.type = 3
 
@@ -436,7 +447,7 @@ class TestIDCTIIIInt(_TestIDCTBase):
 
 class TestIDCTIVDouble(_TestIDCTBase):
     def setup_method(self):
-        self.rdt = np.double
+        self.rdt = np.float64
         self.dec = 12
         self.type = 4
 
@@ -460,9 +471,14 @@ class _TestDSTBase:
         self.dec = None  # number of decimals to match
         self.type = None  # dst type
 
-    def test_definition(self):
+    @pytest.fixture
+    def dst_lock(self):
+        return threading.Lock()
+
+    def test_definition(self, dst_lock):
         for i in FFTWDATA_SIZES:
-            xr, yr, dt = fftw_dst_ref(self.type, i, self.rdt)
+            with dst_lock:
+                xr, yr, dt = fftw_dst_ref(self.type, i, self.rdt)
             y = dst(xr, type=self.type)
             assert_equal(y.dtype, dt)
             # XXX: we divide by np.max(y) because the tests fail otherwise. We
@@ -470,7 +486,7 @@ class _TestDSTBase:
             # difference is due to fftw using a better algorithm w.r.t error
             # propagation compared to the ones from fftpack.
             assert_array_almost_equal(y / np.max(y), yr / np.max(y), decimal=self.dec,
-                    err_msg="Size %d failed" % i)
+                    err_msg=f"Size {i} failed")
 
 
 class _TestDSTIBase(_TestDSTBase):
@@ -497,7 +513,7 @@ class _TestDSTIVBase(_TestDSTBase):
 
 class TestDSTIDouble(_TestDSTIBase):
     def setup_method(self):
-        self.rdt = np.double
+        self.rdt = np.float64
         self.dec = 12
         self.type = 1
 
@@ -518,7 +534,7 @@ class TestDSTIInt(_TestDSTIBase):
 
 class TestDSTIIDouble(_TestDSTBase):
     def setup_method(self):
-        self.rdt = np.double
+        self.rdt = np.float64
         self.dec = 14
         self.type = 2
 
@@ -539,7 +555,7 @@ class TestDSTIIInt(_TestDSTBase):
 
 class TestDSTIIIDouble(_TestDSTBase):
     def setup_method(self):
-        self.rdt = np.double
+        self.rdt = np.float64
         self.dec = 14
         self.type = 3
 
@@ -560,7 +576,7 @@ class TestDSTIIIInt(_TestDSTBase):
 
 class TestDSTIVDouble(_TestDSTIVBase):
     def setup_method(self):
-        self.rdt = np.double
+        self.rdt = np.float64
         self.dec = 12
         self.type = 4
 
@@ -585,9 +601,14 @@ class _TestIDSTBase:
         self.dec = None
         self.type = None
 
-    def test_definition(self):
+    @pytest.fixture
+    def idst_lock(self):
+        return threading.Lock()
+
+    def test_definition(self, idst_lock):
         for i in FFTWDATA_SIZES:
-            xr, yr, dt = fftw_dst_ref(self.type, i, self.rdt)
+            with idst_lock:
+                xr, yr, dt = fftw_dst_ref(self.type, i, self.rdt)
             x = idst(yr, type=self.type)
             if self.type == 1:
                 x /= 2 * (i+1)
@@ -599,12 +620,12 @@ class _TestIDSTBase:
             # difference is due to fftw using a better algorithm w.r.t error
             # propagation compared to the ones from fftpack.
             assert_array_almost_equal(x / np.max(x), xr / np.max(x), decimal=self.dec,
-                    err_msg="Size %d failed" % i)
+                    err_msg=f"Size {i} failed")
 
 
 class TestIDSTIDouble(_TestIDSTBase):
     def setup_method(self):
-        self.rdt = np.double
+        self.rdt = np.float64
         self.dec = 12
         self.type = 1
 
@@ -625,7 +646,7 @@ class TestIDSTIInt(_TestIDSTBase):
 
 class TestIDSTIIDouble(_TestIDSTBase):
     def setup_method(self):
-        self.rdt = np.double
+        self.rdt = np.float64
         self.dec = 14
         self.type = 2
 
@@ -646,7 +667,7 @@ class TestIDSTIIInt(_TestIDSTBase):
 
 class TestIDSTIIIDouble(_TestIDSTBase):
     def setup_method(self):
-        self.rdt = np.double
+        self.rdt = np.float64
         self.dec = 14
         self.type = 3
 
@@ -667,7 +688,7 @@ class TestIDSTIIIInt(_TestIDSTBase):
 
 class TestIDSTIVDouble(_TestIDSTBase):
     def setup_method(self):
-        self.rdt = np.double
+        self.rdt = np.float64
         self.dec = 12
         self.type = 4
 
@@ -695,17 +716,17 @@ class TestOverwrite:
         x2 = x.copy()
         routine(x2, type, fftsize, axis, norm, overwrite_x=overwrite_x)
 
-        sig = "{}({}{!r}, {!r}, axis={!r}, overwrite_x={!r})".format(
-            routine.__name__, x.dtype, x.shape, fftsize, axis, overwrite_x)
+        sig = (f"{routine.__name__}({x.dtype}{x.shape!r}, {fftsize!r}, "
+               f"axis={axis!r}, overwrite_x={overwrite_x!r})")
         if not overwrite_x:
-            assert_equal(x2, x, err_msg="spurious overwrite in %s" % sig)
+            assert_equal(x2, x, err_msg=f"spurious overwrite in {sig}")
 
     def _check_1d(self, routine, dtype, shape, axis):
-        np.random.seed(1234)
+        rng = np.random.RandomState(1234)
         if np.issubdtype(dtype, np.complexfloating):
-            data = np.random.randn(*shape) + 1j*np.random.randn(*shape)
+            data = rng.randn(*shape) + 1j*rng.randn(*shape)
         else:
-            data = np.random.randn(*shape)
+            data = rng.randn(*shape)
         data = data.astype(dtype)
 
         for type in [1, 2, 3, 4]:
