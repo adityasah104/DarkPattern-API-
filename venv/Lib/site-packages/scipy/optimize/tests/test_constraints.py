@@ -97,7 +97,7 @@ def test_prepare_constraint_infeasible_x0():
         return A
 
     def hess(x, v):
-        return sps.csr_matrix((4, 4))
+        return sps.csr_array((4, 4))
 
     nonlinear = NonlinearConstraint(fun, -np.inf, 0, jac, hess,
                                     enforce_feasibility)
@@ -171,7 +171,7 @@ def test_old_bounds_to_new():
 class TestBounds:
     def test_repr(self):
         # so that eval works
-        from numpy import array, inf  # noqa
+        from numpy import array, inf  # noqa: F401
         for args in (
             (-1.0, 5.0),
             (-1.0, np.inf, True),

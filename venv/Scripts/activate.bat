@@ -8,7 +8,7 @@ if defined _OLD_CODEPAGE (
     "%SystemRoot%\System32\chcp.com" 65001 > nul
 )
 
-set VIRTUAL_ENV=D:\coding\ML MOdel\Dark Pattern Model (1)\API\venv
+set VIRTUAL_ENV=E:\New folder (3)\DarkPattern-API-\venv
 
 if not defined PROMPT set PROMPT=$P$G
 

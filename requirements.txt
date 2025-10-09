@@ -1,0 +1,7 @@
+Flask
+gunicorn
+beautifulsoup4
+requests
+joblib
+flask-cors
+scikit-learn

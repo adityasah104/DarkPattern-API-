@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dark Pattern Detector — Web UI</title>
+  <meta name="description" content="Frontend for Dark Pattern detection API" />
+  <style>
+    :root{
+      --bg:#0f1724; --card:#0b1220; --muted:#9aa4b2; --accent:#7c5cff;
+      --success:#16a34a; --danger:#ef4444; --glass: rgba(255,255,255,0.03);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background: linear-gradient(180deg,#061226 0%, #071628 60%);
+      color:#e6eef6; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+      display:flex; align-items:center; justify-content:center; padding:24px;
+    }
+
+    .container{
+      width:100%;
+      max-width:920px;
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:14px; padding:28px; box-shadow: 0 10px 30px rgba(2,6,23,0.6);
+      border: 1px solid rgba(255,255,255,0.03);
+      display:grid; grid-template-columns: 1fr 360px; gap:20px;
+      align-items:start;
+    }
+
+    @media (max-width:880px){
+      .container{ grid-template-columns: 1fr; padding:18px; }
+    }
+
+    header h1{ margin:0 0 6px 0; font-size:20px; letter-spacing: -0.2px }
+    header p{ margin:0; color:var(--muted); font-size:13px }
+
+    form{ display:flex; flex-direction:column; gap:12px; margin-top:8px }
+    label{ font-size:13px; color:var(--muted) }
+    input[type="url"]{
+      width:100%; padding:12px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.04);
+      background:var(--glass); color:inherit; outline:none; font-size:14px;
+      transition:box-shadow .15s, transform .08s;
+    }
+    input[type="url"]:focus{ box-shadow:0 6px 20px rgba(124,92,255,0.12); transform:translateY(-1px) }
+
+    .actions{ display:flex; gap:10px; align-items:center }
+    button{
+      border:0; padding:10px 14px; border-radius:10px; font-weight:600; cursor:pointer;
+      background:linear-gradient(90deg,var(--accent), #6a4bff); color:white; font-size:14px;
+      box-shadow: 0 6px 18px rgba(108,83,255,0.12);
+    }
+    button.secondary{
+      background:transparent; color:var(--muted); border:1px solid rgba(255,255,255,0.03);
+      box-shadow:none; font-weight:600;
+    }
+    .small{ font-size:13px; color:var(--muted) }
+
+    /* Sidebar / result card */
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));
+      padding:16px; border-radius:12px; border:1px solid rgba(255,255,255,0.03);
+      min-height:180px; display:flex; flex-direction:column; gap:12px;
+    }
+    .status{
+      display:flex; align-items:center; gap:10px; justify-content:space-between;
+    }
+    .badge{
+      padding:6px 10px; border-radius:999px; font-weight:700; font-size:13px;
+      display:inline-flex; align-items:center; gap:8px;
+    }
+    .badge.good{ background: rgba(22,163,74,0.12); color:var(--success); border:1px solid rgba(22,163,74,0.12) }
+    .badge.bad{ background: rgba(239,68,68,0.08); color:var(--danger); border:1px solid rgba(239,68,68,0.06) }
+
+    .result-text{ font-size:14px; color: #dfe9fb; margin:0 }
+    pre{
+      white-space:pre-wrap; word-break:break-word; font-size:13px; margin:0;
+      background: rgba(6,10,18,0.3); padding:10px; border-radius:8px; color:var(--muted);
+    }
+
+    .controls{ display:flex; gap:8px; margin-top:auto; align-items:center; justify-content:flex-end }
+    .muted { color:var(--muted); font-size:13px }
+
+    /* spinner */
+    .spinner{
+      width:18px; height:18px; border-radius:50%; border:3px solid rgba(255,255,255,0.08); border-top-color: #fff;
+      animation:spin 1s linear infinite; display:inline-block;
+    }
+    @keyframes spin{ to{ transform:rotate(360deg) } }
+
+    footer{ grid-column:1/-1; margin-top:8px; color:var(--muted); font-size:13px; display:flex; justify-content:space-between; gap:12px; align-items:center }
+    .hint{ color:var(--muted); font-size:13px }
+
+    .copy-btn{ padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.03); background:transparent; color:var(--muted); cursor:pointer }
+  </style>
+</head>
+<body>
+  <main class="container" role="main" aria-labelledby="app-title">
+    <div>
+      <header>
+        <h1 id="app-title">Dark Pattern Detector</h1>
+        <p>Paste a webpage URL and our model will predict if the page contains dark patterns.</p>
+      </header>
+
+      <form id="predict-form" aria-describedby="form-desc" novalidate>
+        <div>
+          <label for="url">Webpage URL</label>
+          <input id="url" name="url" type="url" placeholder="https://example.com/terms" required
+                 aria-required="true" autocomplete="url" />
+        </div>
+
+        <div class="actions">
+          <button type="submit" id="submit-btn">Detect</button>
+          <button type="button" id="example-btn" class="secondary">Use example</button>
+          <div class="small" id="form-desc">Model: <strong>dark_pattern_model.joblib</strong></div>
+        </div>
+
+        <div style="margin-top:6px" class="small">
+          Note: this frontend posts `{"url": "<your-url>"}` to <code>/predict</code> and expects JSON `{"prediction":"0"|"1"}`.
+        </div>
+      </form>
+
+      <footer>
+        <div class="hint">Hosted API should expose <code>/predict</code> POST endpoint.</div>
+        <div class="muted">Built: HTML + Fetch API</div>
+      </footer>
+    </div>
+
+    <aside class="card" aria-live="polite">
+      <div class="status">
+        <div>
+          <div class="small">Prediction</div>
+          <p id="prediction-label" class="result-text">No request yet — submit a URL to detect.</p>
+        </div>
+        <div id="status-badge" class="badge" aria-hidden="true">Idle</div>
+      </div>
+
+      <div>
+        <div class="small">Raw API response</div>
+        <pre id="raw-output">—</pre>
+      </div>
+
+      <div>
+        <div class="small">Snippet of the page (first 500 chars)</div>
+        <pre id="snippet">—</pre>
+      </div>
+
+      <div class="controls" role="region" aria-label="result controls">
+        <button id="copy-btn" class="copy-btn" title="Copy raw response">Copy</button>
+        <button id="open-btn" class="copy-btn" title="Open URL in new tab" disabled>Open URL</button>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    (function(){
+      const form = document.getElementById('predict-form');
+      const urlInput = document.getElementById('url');
+      const submitBtn = document.getElementById('submit-btn');
+      const exampleBtn = document.getElementById('example-btn');
+      const predictionLabel = document.getElementById('prediction-label');
+      const rawOutput = document.getElementById('raw-output');
+      const snippet = document.getElementById('snippet');
+      const statusBadge = document.getElementById('status-badge');
+      const copyBtn = document.getElementById('copy-btn');
+      const openBtn = document.getElementById('open-btn');
+
+      function setLoading(on){
+        if(on){
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<span class="spinner" aria-hidden="true"></span> Detecting';
+          statusBadge.textContent = 'Checking…';
+          statusBadge.className = 'badge';
+        } else {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Detect';
+        }
+      }
+
+      function setResult(predStr, raw, pageSnippet, targetUrl){
+        // Model returns "1" or "0" in your code; adapt as needed.
+        if(predStr === '1' || predStr === 1){
+          predictionLabel.textContent = '⚠️ Dark Pattern Detected';
+          statusBadge.textContent = 'Suspicious';
+          statusBadge.className = 'badge bad';
+        } else if(predStr === '0' || predStr === 0){
+          predictionLabel.textContent = '✅ No Dark Pattern Detected';
+          statusBadge.textContent = 'Clean';
+          statusBadge.className = 'badge good';
+        } else {
+          predictionLabel.textContent = '❓ Unknown response';
+          statusBadge.textContent = 'Unknown';
+          statusBadge.className = 'badge';
+        }
+
+        rawOutput.textContent = JSON.stringify(raw, null, 2);
+        snippet.textContent = pageSnippet ? pageSnippet.slice(0, 500) + (pageSnippet.length > 500 ? '…' : '') : '—';
+        if(targetUrl){
+          openBtn.disabled = false;
+          openBtn.onclick = () => window.open(targetUrl, '_blank', 'noopener');
+        } else {
+          openBtn.disabled = true;
+        }
+      }
+
+      exampleBtn.addEventListener('click', () => {
+        // Put any example URL here. You can change it to a site you expect in tests.
+        urlInput.value = 'https://example.com';
+      });
+
+      form.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        const url = urlInput.value.trim();
+        if(!url){
+          urlInput.focus();
+          return;
+        }
+
+        setLoading(true);
+        statusBadge.textContent = 'Sending request';
+        statusBadge.className = 'badge';
+        try {
+          const res = await fetch('/predict', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url })
+          });
+
+          if(!res.ok){
+            const text = await res.text().catch(()=>null);
+            setLoading(false);
+            predictionLabel.textContent = '❌ Server error';
+            statusBadge.textContent = 'Error';
+            statusBadge.className = 'badge';
+            rawOutput.textContent = `HTTP ${res.status}\n\n${text || 'No body'}`;
+            snippet.textContent = '—';
+            return;
+          }
+
+          const json = await res.json();
+          // The backend currently returns text content only — adjust if your API provides snippet.
+          // Try to display prediction and also any raw keys (like maybe it also returns 'text' or 'snippet')
+          const pred = json.prediction ?? json.result ?? (json?.data && json.data.prediction) ?? null;
+          const pageSnippet = json.snippet ?? json.text?.slice?.(0, 1000) ?? null;
+          setResult(pred, json, pageSnippet, url);
+        } catch (err) {
+          predictionLabel.textContent = '❌ Network error';
+          statusBadge.textContent = 'Offline';
+          statusBadge.className = 'badge';
+          rawOutput.textContent = String(err);
+          snippet.textContent = '—';
+        } finally {
+          setLoading(false);
+        }
+      });
+
+      copyBtn.addEventListener('click', () => {
+        try {
+          navigator.clipboard.writeText(rawOutput.textContent);
+          copyBtn.textContent = 'Copied';
+          setTimeout(()=> copyBtn.textContent = 'Copy', 1400);
+        } catch (e) {
+          copyBtn.textContent = 'Failed';
+          setTimeout(()=> copyBtn.textContent = 'Copy', 1400);
+        }
+      });
+
+      // Small UX: paste from clipboard if empty and user presses paste example
+      urlInput.addEventListener('keydown', (e) => {
+        if(e.key === 'Enter') {
+          e.preventDefault();
+          submitBtn.click();
+        }
+      });
+
+      // Pre-fill with scheme if user types domain only
+      urlInput.addEventListener('blur', () => {
+        const v = urlInput.value.trim();
+        if(v && !/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(v)){
+          urlInput.value = 'https://' + v;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

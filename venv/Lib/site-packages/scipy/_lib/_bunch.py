@@ -9,7 +9,7 @@ def _validate_names(typename, field_names, extra_field_names):
     among field_names + extra_field_names.
     """
     for name in [typename] + field_names + extra_field_names:
-        if type(name) is not str:
+        if not isinstance(name, str):
             raise TypeError('typename and all field names must be strings')
         if not name.isidentifier():
             raise ValueError('typename and all field names must be valid '
@@ -194,6 +194,10 @@ def __setattr__(self, key, val):
         '_asdict': _asdict,
         '_extra_fields': extra_field_names,
         '__getnewargs_ex__': __getnewargs_ex__,
+        # _field_defaults and _replace are added to get Polars to detect
+        # a bunch object as a namedtuple. See gh-22450
+        '_field_defaults': {},
+        '_replace': None,
     }
     for index, name in enumerate(field_names):
 

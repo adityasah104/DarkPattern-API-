@@ -11,6 +11,7 @@ from contextlib import contextmanager
 import numpy as np
 from numpy.testing import (assert_, assert_allclose, assert_equal,
                            break_cycles, suppress_warnings, IS_PYPY)
+import pytest
 from pytest import raises as assert_raises
 
 from scipy.io import netcdf_file
@@ -20,6 +21,9 @@ TEST_DATA_PATH = pjoin(dirname(__file__), 'data')
 
 N_EG_ELS = 11  # number of elements for example variable
 VARTYPE_EG = 'b'  # var type for example variable
+
+
+pytestmark = pytest.mark.thread_unsafe
 
 
 @contextmanager
@@ -244,8 +248,9 @@ def test_itemset_no_segfault_on_readonly():
 
     filename = pjoin(TEST_DATA_PATH, 'example_1.nc')
     with suppress_warnings() as sup:
-        sup.filter(RuntimeWarning,
-                   "Cannot close a netcdf_file opened with mmap=True, when netcdf_variables or arrays referring to its data still exist")
+        message = ("Cannot close a netcdf_file opened with mmap=True, when "
+                   "netcdf_variables or arrays referring to its data still exist")
+        sup.filter(RuntimeWarning, message)
         with netcdf_file(filename, 'r', mmap=True) as f:
             time_var = f.variables['time']
 
@@ -346,8 +351,9 @@ def test_mmaps_segfault():
 
     # should not crash
     with suppress_warnings() as sup:
-        sup.filter(RuntimeWarning,
-                   "Cannot close a netcdf_file opened with mmap=True, when netcdf_variables or arrays referring to its data still exist")
+        message = ("Cannot close a netcdf_file opened with mmap=True, when "
+                   "netcdf_variables or arrays referring to its data still exist")
+        sup.filter(RuntimeWarning, message)
         x = doit()
     x.sum()
 
@@ -426,7 +432,8 @@ def test_append_recordDimension():
             # Read the file and check that append worked
             with netcdf_file('withRecordDimension.nc') as f:
                 assert_equal(f.variables['time'][-1], i)
-                assert_equal(f.variables['testData'][-1, :, :].copy(), np.full((dataSize, dataSize), i))
+                assert_equal(f.variables['testData'][-1, :, :].copy(),
+                             np.full((dataSize, dataSize), i))
                 assert_equal(f.variables['time'].data.shape[0], i+1)
                 assert_equal(f.variables['testData'].data.shape[0], i+1)
 

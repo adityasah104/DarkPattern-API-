@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: dark-pattern-detector
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn my_app:app
+    envVars:
+      - key: PORT
+        value: 10000
